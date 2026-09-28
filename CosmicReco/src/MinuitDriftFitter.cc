@@ -215,19 +215,19 @@ void DoDriftTimeFit(
 
   // Initiate Minuit Fit:
   ROOT::Minuit2::MnStrategy mnStrategy(2);
-  ROOT::Minuit2::MnUserParameters params(pars, errors);
-  ROOT::Minuit2::MnMigrad migrad(fit, params, mnStrategy);
-
+  ROOT::Minuit2::MnUserParameterState state(
+      ROOT::Minuit2::MnUserParameters(pars, errors));
   if (mnprecision > 0) {
-    migrad.State().SetPrecision(mnprecision);
+    state.SetPrecision(mnprecision);
   }
 
   // Do first fit stage with fixed drift res
   // and minimal t0
   fit.setFixedT0(true);
   fit.setFixedDriftRes(true,driftres);
-  migrad.State().Fix(4);
-  ROOT::Minuit2::FunctionMinimum temp_min = migrad(0, mntolerance);
+  state.Fix(4);
+  ROOT::Minuit2::MnMigrad migrad1(fit, state, mnStrategy);
+  ROOT::Minuit2::FunctionMinimum temp_min = migrad1(0, mntolerance);
   ROOT::Minuit2::MnUserParameters const& temp_results = temp_min.UserParameters();
   for (size_t i=0;i<4;i++){
     pars[i] = temp_results.Params()[i];
@@ -239,10 +239,11 @@ void DoDriftTimeFit(
   pars[4] = fit.averageT0(pars);
   fit.setFixedT0(false);
   fit.setFixedDriftRes(false);
-  migrad.State().Release(4);
+  state.Release(4);
 
   // Define Minimization method as "MIGRAD" (see minuit documentation)
-  ROOT::Minuit2::FunctionMinimum min = migrad(0, mntolerance);
+  ROOT::Minuit2::MnMigrad migrad2(fit, state, mnStrategy);
+  ROOT::Minuit2::FunctionMinimum min = migrad2(0, mntolerance);
   if (diag > 1) {
     ROOT::Minuit2::MnPrint::SetGlobalLevel(3);
     ROOT::Minuit2::operator<<(std::cout, min);

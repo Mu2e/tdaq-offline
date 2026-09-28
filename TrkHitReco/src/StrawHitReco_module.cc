@@ -226,6 +226,7 @@ namespace mu2e {
       }
       if(_flagXT){
         _shrUtils.flagCrossTalk(shCol, chCol);
+      }
     }
     if(_writesh)event.put(std::move(shCol));
     intInfo->setNTrackerHits(chCol->size());
