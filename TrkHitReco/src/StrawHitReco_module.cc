@@ -207,6 +207,7 @@ namespace mu2e {
       TrackerStatus const& trackerStatus = _trackerStatus_h.get(event.id());
 
       double pmp(0.0);
+      double pedestal(0.0);
       for (size_t isd=0;isd<sdcol.size();++isd) {
         const StrawDigi& digi = sdcol[isd];
         if(!_useADCWF){
@@ -214,16 +215,17 @@ namespace mu2e {
         } else {
           auto const& adcwf = sdadcc->at(isd).samples();
           ADCWFIter maxiter;
-          pmp = _shrUtils.peakMinusPedWF(adcwf,srep,maxiter);
+          auto pair = _shrUtils.peakMinusPedWF(adcwf,srep,maxiter);
+          pmp = pair.first;
+          pedestal = pair.second;
           if(_diagLevel > 0)_maxiter->Fill( std::distance(adcwf.begin(),maxiter));
         }
         _shrUtils.createComboHit(ewm, isd, chCol, shCol, caloClusters, pbtOffset,
-            digi.strawId(), digi.TDC(), digi.TOT(), pmp,
+            digi.strawId(), digi.TDC(), digi.TOT(), pmp, pedestal,
             trackerStatus,  srep, tt);
       }
       if(_flagXT){
         _shrUtils.flagCrossTalk(shCol, chCol);
-      }
     }
     if(_writesh)event.put(std::move(shCol));
     intInfo->setNTrackerHits(chCol->size());
