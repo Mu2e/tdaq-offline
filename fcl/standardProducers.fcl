@@ -3,7 +3,6 @@
 # this file is deprecated: please include the individual producers you need from the appropriate specific prologs below
 #
 #include "Offline/fcl/TrkCaloDt.fcl"
-#include "Offline/EventGenerator/fcl/prolog.fcl"
 #include "Offline/Filters/fcl/prolog.fcl"
 #include "Offline/Compression/fcl/prolog.fcl"
 #include "Offline/Mu2eG4/fcl/prolog.fcl"
