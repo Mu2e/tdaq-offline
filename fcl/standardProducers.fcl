@@ -5,7 +5,6 @@
 #include "Offline/fcl/TrkCaloDt.fcl"
 #include "Offline/Filters/fcl/prolog.fcl"
 #include "Offline/Compression/fcl/prolog.fcl"
-#include "Offline/Mu2eG4/fcl/prolog.fcl"
 #include "Offline/TrackerMC/fcl/prolog.fcl"
 #include "Offline/CaloCluster/fcl/prolog.fcl"
 #include "Offline/ExtinctionMonitorFNAL/fcl/prolog.fcl"
