@@ -207,7 +207,6 @@ namespace mu2e {
       TrackerStatus const& trackerStatus = _trackerStatus_h.get(event.id());
 
       double pmp(0.0);
-      double pedestal(0.0);
       for (size_t isd=0;isd<sdcol.size();++isd) {
         const StrawDigi& digi = sdcol[isd];
         if(!_useADCWF){
@@ -215,15 +214,15 @@ namespace mu2e {
         } else {
           auto const& adcwf = sdadcc->at(isd).samples();
           ADCWFIter maxiter;
-          auto pair = _shrUtils.peakMinusPedWF(adcwf,srep,maxiter);
-          pmp = pair.first;
-          pedestal = pair.second;
+          pmp = _shrUtils.peakMinusPedWF(adcwf,srep,maxiter);
           if(_diagLevel > 0)_maxiter->Fill( std::distance(adcwf.begin(),maxiter));
         }
         _shrUtils.createComboHit(ewm, isd, chCol, shCol, caloClusters, pbtOffset,
-            digi.strawId(), digi.TDC(), digi.TOT(), pmp, pedestal,
+            digi.strawId(), digi.TDC(), digi.TOT(), pmp,
             trackerStatus,  srep, tt);
       }
+      //flag straw and electronic cross-talk: this scans the whole collection, so it must run once
+      //per event, not once per digi
       if(_flagXT){
         _shrUtils.flagCrossTalk(shCol, chCol);
       }
