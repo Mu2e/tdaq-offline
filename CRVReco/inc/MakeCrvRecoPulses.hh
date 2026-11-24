@@ -1,9 +1,9 @@
 #ifndef MakeCrvRecoPulses_h
 #define MakeCrvRecoPulses_h
 
+#include <array>
+#include <cstdint>
 #include <vector>
-#include <TF1.h>
-#include <TGraph.h>
 
 namespace mu2eCrv
 {
@@ -13,7 +13,8 @@ class MakeCrvRecoPulses
   public:
   MakeCrvRecoPulses(float minADCdifference, float defaultBeta, float minBeta, float maxBeta,
                     float maxTimeDifference, float minPulseHeightRatio, float maxPulseHeightRatio,
-                    float LEtimeFactor, int samplesBefore, int samplesAfter);
+                    float LEtimeFactor, int samplesBefore, int samplesAfter,
+                    bool removeRingingArtifacts, float ringingArtifactParam0, float ringingArtifactParam1, float ringingArtifactParam2);
   void         SetWaveform(const std::vector<int16_t> &waveform, uint16_t startTDC,
                            float digitizationPeriod, float pedestal, float calibrationFactor,
                            float calibrationFactorPulseHeight);
@@ -27,14 +28,26 @@ class MakeCrvRecoPulses
   const std::vector<float>  &GetPulseFitChi2s() const  {return _pulseFitChi2s;}
   const std::vector<bool>   &GetZeroNdfs() const       {return _zeroNdf;}
   const std::vector<bool>   &GetFailedFits() const     {return _failedFits;}
+  const std::vector<double> &GetRingingArtifactTimes() const    {return _ringingArtifactTimes;}
+  const std::vector<float>  &GetRingingArtifactHeights() const  {return _ringingArtifactHeights;}
+  const std::vector<float>  &GetRingingArtifactBetas() const    {return _ringingArtifactBetas;}
 
   private:
-  MakeCrvRecoPulses();
-  bool FindNextPeak(const TGraph &g, int start, int &peakStart, int &peakEnd, int &fitStart, int &fitEnd);
-  void SubtractPulse(TGraph &g, uint16_t startTDC, float digitizationPeriod);
-  bool FailedFit(TFitResultPtr fr);
+  typedef std::array<double,3> Vec3;
 
-  TF1    _f1;
+  struct FitResult
+  {
+    Vec3   par;
+    double chi2;
+    bool   converged;
+    bool   hessianOk;
+  };
+
+  MakeCrvRecoPulses();
+  bool FindNextPeak(const std::vector<double> &y, int start, int &peakStart, int &peakEnd, int &fitStart, int &fitEnd) const;
+  FitResult FitGumbel(const std::vector<double> &t, const std::vector<double> &y,
+                      const Vec3 &p0, const Vec3 &lower, const Vec3 &upper) const;
+
   float  _minADCdifference;
   float  _defaultBeta;
   float  _minBeta, _maxBeta;
@@ -42,11 +55,16 @@ class MakeCrvRecoPulses
   float  _minPulseHeightRatio, _maxPulseHeightRatio;
   float  _LEtimeFactor;
   int    _samplesBefore, _samplesAfter;
+  bool   _removeRingingArtifacts;
+  float  _ringingArtifactParam0, _ringingArtifactParam1, _ringingArtifactParam2;
 
   std::vector<float>  _PEs, _PEsPulseHeight;
   std::vector<double> _pulseTimes, _LEtimes;
   std::vector<float>  _pulseHeights, _pulseBetas, _pulseFitChi2s;
   std::vector<bool>   _zeroNdf, _failedFits;
+
+  std::vector<double> _ringingArtifactTimes;
+  std::vector<float>  _ringingArtifactHeights, _ringingArtifactBetas;
 };
 
 }

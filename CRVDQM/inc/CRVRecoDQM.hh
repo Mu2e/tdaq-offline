@@ -8,6 +8,14 @@
 // The MPV maps are fit results and do not merge. After hadd, refit the merged
 // crvPEsVsChannel with FitPEsVsChannel().
 //
+// Sector-pair timing: the coincidence times of clusters in two different
+// sectors of one event, one TH1F per unordered sector pair. Cluster times are
+// built from calibrated pulse times, so a pair that spans two ROCs compares
+// the ROCs with the calibration applied: a shifted peak is a ROC (or FEB)
+// whose offset moved. The peak also holds the muon's flight time between the
+// sectors, constant for a fixed geometry. A cluster with pulses in more than
+// one sector (the finder groups sectors by type) is left out and counted.
+//
 // Original Author: R. Mina
 
 #include "Offline/CRVDQM/inc/CRVDQMRun1.hh"
@@ -30,17 +38,16 @@ namespace mu2e {
 
 class CRVRecoDQM : public DQMClient {
 public:
-  static constexpr int kBinningVersion = 2;
+  // 4: crvCoincidenceDt_* sector pairs.
+  static constexpr int kBinningVersion = 4;
 
   static constexpr DQMAxis kOne{1, 0.5, 1.5};
   static constexpr DQMAxis kSectorType{10, 0., 10.};
   static constexpr DQMAxis kPE{75, 0., 150.};
-  static constexpr DQMAxis kOfflineChannel =
-      DQMAxis::Counts(0, CRVDQMRun1::kNOfflineChannels - 1);
   static constexpr DQMAxis kRocChannelEdges{CRVDQMRun1::kNChanPerROC, 0., CRVDQMRun1::kNChanPerROC};
   static constexpr DQMAxis kFebChannelEdges{CRVDQMRun1::kNChanPerFEB, 0., CRVDQMRun1::kNChanPerFEB};
-  // The global FEB ID axis is sized by the configuration:
-  // CRVDQMRun1::globalFebEdgesAxis(c).
+  // The global FEB ID and offline channel axes are sized by the configuration:
+  // CRVDQMRun1::globalFebEdgesAxis(c), offlineChannelAxis(c).
   // DqmCrv / ValCrv* plots. "2" is the full-readout-window view: KPP windows
   // reach ~410 us.
   static constexpr DQMAxis kNPulses{101, -0.5, 100.5};
@@ -54,6 +61,8 @@ public:
   static constexpr DQMAxis kLogChi2{100, -3., 5.};
   static constexpr DQMAxis kNClusters{101, -0.5, 100.5};
   static constexpr DQMAxis kClusterPE{250, 0., 5000.};
+  // t_B - t_A of two clusters in sectors A < B (configuration sector order).
+  static constexpr DQMAxis kSectorDt = DQMAxis::Symmetric(100., 0.5);
 
   // MPV fit: window as a fraction of the spectrum peak, its hard low edge, and
   // the least a spectrum must hold to be fitted.
@@ -75,8 +84,9 @@ public:
   static std::vector<LandauGaussResult> FitPEsVsChannel(const TH2& peVsChannel);
 
   // `configuration` (CRVDQMRun1::Configuration) sizes the readout-indexed MPV
-  // maps, chooses the per-sector family and the cluster position axes; fixed
-  // at construction and stamped as the binning variant.
+  // maps and the offline channel axis of crvPEsVsChannel, chooses the
+  // per-sector family and the cluster position axes; fixed at construction
+  // and stamped as the binning variant.
   explicit CRVRecoDQM(const DQMHistSet::Config& hists = {},
                       int configuration = CRVDQMRun1::kRun1a);
 
@@ -85,7 +95,8 @@ public:
   // Caller-injected layout, callable any time after Book(). channelToSector:
   // offline channel -> index into the configuration's CRVDQMRun1 sector list,
   // -1 to skip it (how a caller drops notConnected channels). A configuration
-  // other than the booked one is refused (diagnostic).
+  // other than the booked one is refused (diagnostic); geometry channels past
+  // the booked offline channel axis are counted (diagnostic) and not fitted.
   void SetConfiguration(int configuration, const std::vector<int>& channelToSector);
 
   void Fill(const CrvCoincidenceClusterCollection& clusters);
@@ -122,6 +133,10 @@ public:
   TH1D* X() const { return position(0); }
   TH1D* Y() const { return position(1); }
   TH1D* Z() const { return position(2); }
+  // Coincidence dt of two different sectors (indices into the booked
+  // configuration's sector list, either order): t of the later sector in the
+  // list minus t of the earlier, crvCoincidenceDt_<cfg>_<earlier>_<later>.
+  TH1F* sectorDt(int sectorA, int sectorB) const;
 
   std::size_t nEventsWithClusters() const { return nEventsWithClusters_; }
   std::size_t nClusters() const { return nClusters_; }
@@ -136,6 +151,11 @@ private:
   TH1D* position(int coordinate) const;
   void fillClusters(const CrvCoincidenceClusterCollection& clusters);
   void fillRecoPulses(const CrvRecoPulseCollection& recoPulses);
+  static constexpr int kNoSector = -1;        //no pulse on a mapped channel
+  static constexpr int kSeveralSectors = -2;  //mapped pulses in more than one sector
+  // The one sector of the cluster's mapped pulses, or kNoSector / kSeveralSectors.
+  int clusterSector(const CrvCoincidenceCluster& cluster) const;
+  int sectorPairIndex(int sectorA, int sectorB) const;  //sectorA < sectorB
 
   DQMH1<TH1F> h_nEventsWithClusters_;
   DQMH1<TH1I> h_coincidenceClusters_;
@@ -162,6 +182,7 @@ private:
   DQMH1<TH1D> h_tc_;
   DQMH1<TH1D> h_t2c_;
   std::vector<DQMH1<TH1D>> h_position_;  //[x,y,z] of the booked configuration
+  std::vector<DQMH1<TH1F>> h_sectorDt_;  //[sectorPairIndex]
 
   const int bookedConfiguration_;
   int configuration_{-1};  //set by SetConfiguration; the booked one or -1

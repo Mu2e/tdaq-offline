@@ -181,6 +181,7 @@ namespace mu2e {
     produces<KKTRKCOL>();
     produces<KalSeedCollection>();
     if(settings().extrapSettings())extrap_ = make_unique<KKExtrap>(*settings().extrapSettings());
+    if(extrap_) extrap_->checkConfig(config_);
     if( fillMCAssns_){
       consumes<KalSeedMCAssns>(ksmca_T_);
       produces <KalSeedMCAssns>();
@@ -359,7 +360,9 @@ namespace mu2e {
   }
 
   void RegrowLoopHelix::endJob()
-  {}
+  {
+    if(extrap_) extrap_->printSummary(moduleDescription().moduleLabel());
+  }
 
 }
 DEFINE_ART_MODULE(mu2e::RegrowLoopHelix)

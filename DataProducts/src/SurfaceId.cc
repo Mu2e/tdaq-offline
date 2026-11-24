@@ -38,6 +38,7 @@ namespace mu2e {
     std::make_pair(SurfaceIdEnum::IPA_Back, "IPA_Back"),
     std::make_pair(SurfaceIdEnum::OPA, "OPA"),
     std::make_pair(SurfaceIdEnum::TSDA, "TSDA"),
+    std::make_pair(SurfaceIdEnum::TS5_Face, "TS5_Face"),
     std::make_pair(SurfaceIdEnum::ST_Front, "ST_Front"),
     std::make_pair(SurfaceIdEnum::ST_Back, "ST_Back"),
     std::make_pair(SurfaceIdEnum::ST_Inner, "ST_Inner"),
@@ -80,7 +81,19 @@ namespace mu2e {
     std::make_pair(SurfaceIdEnum::CRV_M7, "CRV_M7"),
     std::make_pair(SurfaceIdEnum::CRV_M8, "CRV_M8"),
     std::make_pair(SurfaceIdEnum::CRV_StrongBack, "CRV_StrongBack"),
-    std::make_pair(SurfaceIdEnum::DS_HatchConcrete, "DS_HatchConcrete")
+    std::make_pair(SurfaceIdEnum::DS_HatchConcrete, "DS_HatchConcrete"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_0_Outer, "EMC_Disk_0_Outer"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_0_Inner, "EMC_Disk_0_Inner"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_1_Inner, "EMC_Disk_1_Inner"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_1_Outer, "EMC_Disk_1_Outer"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_0_Front, "EMC_Disk_0_Front"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_1_Front, "EMC_Disk_1_Front"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_0_Back, "EMC_Disk_0_Back"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_1_Back, "EMC_Disk_1_Back"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_0_FrontPanel, "EMC_Disk_0_FrontPanel"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_1_FrontPanel, "EMC_Disk_1_FrontPanel"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_0_InnerRing, "EMC_Disk_0_InnerRing"),
+    std::make_pair(SurfaceIdEnum::EMC_Disk_1_InnerRing, "EMC_Disk_1_InnerRing")
     };
 
     constexpr std::size_t nSurfaceIdNames = sizeof(surfaceIdNames)/sizeof(surfaceIdNames[0]);

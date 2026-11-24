@@ -7,6 +7,7 @@
 
 // C++ include files
 #include <iostream>
+#include <map>
 #include <utility>
 
 // Framework include files
@@ -241,7 +242,7 @@ namespace mu2e {
       StraightSection const * ts1vac = beamline.getTS().getTSVacuum<StraightSection>( TransportSolenoid::TSRegion::TS1 );
       const double vacPS_TS_z = ts1vac->getGlobal().z() - ts1vac->getHalfLength();
 
-      addDetector(PSVacuumMaker::make(*_config, ps, pse, vacPS_TS_z));
+      addDetector(PSVacuumMaker::make(*_config, ps, pse, vacPS_TS_z, beamline.getTS()));
 
       // Use ProductionTarget's built-in method to get the correct position based on model type
       addDetector(PSShieldMaker::make(*_config, ps.psEndRefPoint(), prodTarget.targetPositionByVersion()));
@@ -300,7 +301,7 @@ namespace mu2e {
       }
 
       if(_config->getBool("hasTSdA",false)){
-        addDetector( TSdAMaker::make(*_config,ds) );
+        addDetector( TSdAMaker::make(*_config,ds,beamline) );
       }
 
       if(_config->getBool("hasExternalShielding",false)) {
@@ -338,7 +339,27 @@ namespace mu2e {
 
       if(_bfConfig->getBool("hasBFieldManager",false)){
         std::unique_ptr<BFieldConfig> bfc( BFieldConfigMaker(*_bfConfig, beamline).getBFieldConfig() );
-        BFieldManagerMaker bfmgr(*bfc);
+        // Per-map field scales come from the geometry file, so a geometry
+        // can carry its own field: double bfield.mapScale.<map name> = <factor>;
+        const std::string scalePrefix = "bfield.mapScale.";
+        std::vector<std::string> bfNames;
+        _bfConfig->getNames(bfNames);
+        for (auto const& name : bfNames) {
+          if (name.rfind(scalePrefix, 0) == 0) {
+            throw cet::exception("GEOM")
+              << name << " is set in the bfield file " << _bFieldFile
+              << "; per-map scales are read from the geometry file only\n";
+          }
+        }
+        std::map<std::string, double> mapScales;
+        std::vector<std::string> names;
+        _config->getNames(names);
+        for (auto const& name : names) {
+          if (name.rfind(scalePrefix, 0) == 0) {
+            mapScales[name.substr(scalePrefix.size())] = _config->getDouble(name);
+          }
+        }
+        BFieldManagerMaker bfmgr(*bfc, mapScales);
         addDetector(std::move(bfc));
         addDetector(bfmgr.getBFieldManager());
       }

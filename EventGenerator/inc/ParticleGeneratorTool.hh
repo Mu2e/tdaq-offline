@@ -6,6 +6,7 @@
 #include <string>
 
 #include "CLHEP/Vector/LorentzVector.h"
+#include "CLHEP/Vector/ThreeVector.h"
 
 #include "art/Utilities/ToolConfigTable.h"
 #include "art/Framework/Services/Optional/RandomNumberGenerator.h"
@@ -28,6 +29,8 @@ namespace mu2e {
       PDGCode::type pdgId;
       ProcessCode creationCode;
       CLHEP::HepLorentzVector fourmom;
+      CLHEP::Hep3Vector positionOffset{0., 0., 0.}; // production point relative to the muon stop (mm), e.g. a displaced decay
+      double timeDelay = 0.; // production time relative to the muon decay/capture time (ns)
     };
 
     virtual void finishInitialization(art::RandomNumberGenerator::base_engine_t& eng, const std::string& materialName,
@@ -61,7 +64,9 @@ namespace mu2e {
       pset.erase(var_high);
       BinnedSpectrum fullSpectrum(pset);
 
-      // Calculate the integrals
+      // Calculate the integrals. The PDF values are densities, and the two spectra can have
+      // different bin widths (e.g. a fixed number of bins over different ranges), so weight each
+      // sum by its own bin width
       double integral = 0.;
       double fullIntegral = 0.;
       for(size_t ibin=0;ibin < spectrum.getNbins();++ibin){
@@ -70,13 +75,14 @@ namespace mu2e {
       for(size_t ibin=0;ibin < fullSpectrum.getNbins();++ibin){
         fullIntegral += fullSpectrum.getPDF(ibin);
       }
+      integral *= spectrum.getBinWidth();
+      fullIntegral *= fullSpectrum.getBinWidth();
       // The "full" integral may be missing the lowest tail component in some cases (e.g. DIO)
       // --> apply a linear interpolation correction if requested
       const double xmin = fullSpectrum.getXMin();
       if(correct_full_integral && xmin > full_var_low) {
         const double pdfmin  = fullSpectrum.getPDF(0);
-        const double binsize = fullSpectrum.getBinWidth();
-        fullIntegral += 0.5*(pdfmin/binsize)*(xmin - full_var_low); // 0 to <pdfmin> over x = <spectrum low edge> to <xmin> linear interpolation
+        fullIntegral += 0.5*pdfmin*(xmin - full_var_low); // 0 to <pdfmin> over x = <spectrum low edge> to <xmin> linear interpolation
       }
 
       // Evaluate the fraction being sampled

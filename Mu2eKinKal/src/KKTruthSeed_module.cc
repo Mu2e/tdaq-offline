@@ -97,6 +97,7 @@ namespace mu2e {
       explicit KKTruthSeed(const Parameters& settings);
       void beginRun(art::Run& run) override;
       void produce(art::Event& event) override;
+      void endJob() override;
 
     private:
       // true muon state (pos, mom, time) from the MC trajectory point nearest a detector-frame location.
@@ -183,6 +184,8 @@ namespace mu2e {
         if(dn <= 0.0) continue;
         dir /= dn;
         double ke = pts[i].kineticEnergy();
+        // a particle at rest (e.g. the end point of a stopped muon) has no direction of motion to seed a track with
+        if(!(ke > 0.0)) continue;
         double pmag = std::sqrt(ke*ke + 2.0*ke*mass); // |p| from kinetic energy
         bestd2 = d2; found = true; tpos = pd; tmom = pmag*dir; ttime = pts[i].t();
       }
@@ -241,6 +244,13 @@ namespace mu2e {
         }
       }();
       tpiece.params() = KinKal::Parameters(tpiece.params().parameters(), seedcov_);
+      // a non-finite truth piece would poison the ParameterHit weights and abort the event
+      bool finite = true;
+      for(size_t ipar = 0; ipar < KinKal::NParams(); ++ipar) finite &= std::isfinite(tpiece.params().parameters()[ipar]);
+      if(!finite){
+        if(debug_ > 0) std::cout << "KKTruthSeed: non-finite truth piece at t " << htime << "; skipping" << std::endl;
+        continue;
+      }
       truthpt.append(tpiece);
       truthHitTimes.emplace_back(htime);
     }
@@ -323,6 +333,10 @@ namespace mu2e {
     tsseed._hitcalibs = recoseed.hitCalibInfos();
     tsseed._chit = recoseed.caloHit();
     return tsseed;
+  }
+
+  void KKTruthSeed::endJob() {
+    if(extrap_) extrap_->printSummary(moduleDescription().moduleLabel());
   }
 
   void KKTruthSeed::produce(art::Event& event) {

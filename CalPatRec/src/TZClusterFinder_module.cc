@@ -212,7 +212,8 @@ namespace mu2e {
       consumes<ComboHitCollection>(_chLabel);
       consumes<CaloClusterCollection>(_ccLabel);
       produces<TimeClusterCollection>();
-      produces<IntensityInfoTimeCluster>();
+      produces<IntensityInfoTimeCluster>("electron");
+      produces<IntensityInfoTimeCluster>("proton");
       if(_protonTCs) produces<TimeClusterCollection>("proton");
 
 
@@ -298,18 +299,20 @@ namespace mu2e {
 
     _data._event = &event;
 
-    std::unique_ptr<IntensityInfoTimeCluster> iiTC(new IntensityInfoTimeCluster);
+    std::unique_ptr<IntensityInfoTimeCluster> iiTC_e(new IntensityInfoTimeCluster);
+    std::unique_ptr<IntensityInfoTimeCluster> iiTC_p(new IntensityInfoTimeCluster);
     std::unique_ptr<TimeClusterCollection>    tcColl(new TimeClusterCollection);
     std::unique_ptr<TimeClusterCollection>    protonTCColl = (_protonTCs) ? std::make_unique<TimeClusterCollection>() : nullptr;
 
     _data._tcColl = tcColl.get();
-    _data._iiTC = iiTC.get();
+    _data._iiTC = iiTC_p.get();
     _data._protonTCColl = (_protonTCs) ? protonTCColl.get() : nullptr;
 
     bool ok = findData(event);
 
     if (ok) { findClusters(*_data._tcColl); }
     else    { printf("%s ERROR: No straw hits found in event %i\n",oname,_iev); }
+    iiTC_e->setNTCs(tcColl->size());
 
     if (_diagLevel > 0) { _hmanager->fillHistograms(&_data);}
 
@@ -320,7 +323,8 @@ namespace mu2e {
       std::erase_if(*tcColl, [](const TimeCluster& tc) { return !tc.hasCaloCluster();});
     }
     event.put(std::move(tcColl));
-    event.put(std::move(iiTC));
+    event.put(std::move(iiTC_e), "electron");
+    event.put(std::move(iiTC_p), "proton");
     if(_protonTCs) event.put(std::move(protonTCColl), "proton");
 
     _timeoutGuard.reset();
@@ -792,7 +796,7 @@ namespace mu2e {
       }
     }
 
-    outIITC.setNProtonTCs(nProtons);
+    outIITC.setNTCs(nProtons);
 
   }
 
@@ -831,10 +835,16 @@ namespace mu2e {
       }
       if (_recoverCaloClusters == 1) {
         if (addedToTC == 0) {
-          _f.clear_chunkInfo();
+          // start from a fully reset chunk: clear_chunkInfo() only clears hIndices and the fitter, and
+          // every other field would otherwise keep the values of the last chunk built or copied
+          _f._chunkInfo = chunkInfo{};
           _f._chunkInfo.nHits = 0;
           _f._chunkInfo.nStrawHits = 0;
           _f._chunkInfo.caloIndex = i;
+          _f._chunkInfo.nrgSelection = 1; // only energysel (CE-like) hits are recovered below
+          _f._chunkInfo.nCombines = 0;
+          _f._chunkInfo.goodCluster = true;
+          float sumTime(0.f), sumZpos(0.f);
           for (size_t k=0; k<_data._chColl->size(); k++) {
             const StrawHitFlag flag = _data._chColl->at(k).flag();
             if (!flag.hasAnyProperty(StrawHitFlag::radsel) && _radSelect == 1) {continue;}
@@ -844,9 +854,17 @@ namespace mu2e {
             if (std::abs(hit->correctedTime() - ccTime) < _caloDtMax) {
               _f._chunkInfo.hIndices.push_back(k);
               _f._chunkInfo.fitter.addPoint(hit->pos().z(), hit->correctedTime(), (hit->timeVar() > 0.) ? 1/(hit->timeVar()) : 0.);
+              if (_f._chunkInfo.nHits == 0 || hit->pos().z() < _f._chunkInfo.zMin) _f._chunkInfo.zMin = hit->pos().z();
+              if (_f._chunkInfo.nHits == 0 || hit->pos().z() > _f._chunkInfo.zMax) _f._chunkInfo.zMax = hit->pos().z();
+              sumTime += hit->correctedTime();
+              sumZpos += hit->pos().z();
               _f._chunkInfo.nHits++;
               _f._chunkInfo.nStrawHits = _f._chunkInfo.nStrawHits + hit->nStrawHits();
             }
+          }
+          if (_f._chunkInfo.nHits > 0) {
+            _f._chunkInfo.avgTime = sumTime/_f._chunkInfo.nHits;
+            _f._chunkInfo.avgZpos = sumZpos/_f._chunkInfo.nHits;
           }
           if (_f._chunkInfo.nStrawHits >= _clusterThresh) {
             _f.chunks.push_back(_f._chunkInfo);

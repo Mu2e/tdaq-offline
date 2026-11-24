@@ -6,6 +6,7 @@ cet_make_library(
       src/DYBGenerator.cc
       src/ExtMonFNALGunImpl.cc
       src/FromG4BLFile.cc
+      src/MuonNucleonKinematics.cc
       src/ParticleGun.cc
       src/ParticleGunImpl.cc
       src/PiCaptureEffects.cc
@@ -26,6 +27,7 @@ cet_make_library(
       Offline::SeedService
       Offline::StoppingTargetGeom
       CRY
+      fhiclcpp::types
 )
 
 cet_build_plugin(AntiProtonGun art::module
@@ -548,6 +550,28 @@ cet_build_plugin(Mu2eXGenerator art::tool
       Offline::Mu2eUtilities
 )
 
+cet_build_plugin(MuCapBNVGenerator art::tool
+    REG_SOURCE src/MuCapBNVGenerator_tool.cc
+    LIBRARIES REG
+      Offline::EventGenerator
+      
+      Offline::DataProducts
+      Offline::GlobalConstantsService
+      Offline::MCDataProducts
+      Offline::Mu2eUtilities
+)
+
+cet_build_plugin(MuCapDarkCascadeGenerator art::tool
+    REG_SOURCE src/MuCapDarkCascadeGenerator_tool.cc
+    LIBRARIES REG
+      Offline::EventGenerator
+      
+      Offline::DataProducts
+      Offline::GlobalConstantsService
+      Offline::MCDataProducts
+      Offline::Mu2eUtilities
+)
+
 cet_build_plugin(MuCap1809keVGammaGenerator art::tool
     REG_SOURCE src/MuCap1809keVGammaGenerator_tool.cc
     LIBRARIES REG
@@ -561,6 +585,28 @@ cet_build_plugin(MuCap1809keVGammaGenerator art::tool
 
 cet_build_plugin(MuCapDeuteronGenerator art::tool
     REG_SOURCE src/MuCapDeuteronGenerator_tool.cc
+    LIBRARIES REG
+      Offline::EventGenerator
+      
+      Offline::DataProducts
+      Offline::GlobalConstantsService
+      Offline::MCDataProducts
+      Offline::Mu2eUtilities
+)
+
+cet_build_plugin(MuCapTritonGenerator art::tool
+    REG_SOURCE src/MuCapTritonGenerator_tool.cc
+    LIBRARIES REG
+      Offline::EventGenerator
+      
+      Offline::DataProducts
+      Offline::GlobalConstantsService
+      Offline::MCDataProducts
+      Offline::Mu2eUtilities
+)
+
+cet_build_plugin(MuCapAlphaGenerator art::tool
+    REG_SOURCE src/MuCapAlphaGenerator_tool.cc
     LIBRARIES REG
       Offline::EventGenerator
       

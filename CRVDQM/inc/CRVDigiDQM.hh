@@ -10,6 +10,12 @@
 // and picks the per-sector family. Every job of a configuration writes the
 // same set, stamped `variant=<configuration>`, and files merge within it.
 //
+// The one exception is the configured dtPair_* family: FHiCL lists the
+// (ROC, FEB, FPGA) pairs to compare, and only those are booked. A non-empty
+// list is appended to the stamped variant (`extracted+dtPairs:<pairs>`, sorted),
+// so only jobs with the same list merge; the reference catalogues are written
+// with an empty list.
+//
 // Original Author: R. Mina
 
 #include "Offline/CRVDQM/inc/CRVDQMRun1.hh"
@@ -34,7 +40,7 @@ namespace mu2e {
 
 class CRVDigiDQM : public DQMClient {
 public:
-  static constexpr int kBinningVersion = 2;
+  static constexpr int kBinningVersion = 3;
 
   // Axes. Each quantity whose range differs by orders of magnitude between
   // on-spill Run 1 and the ~400 us KPP readout window has a short view and a
@@ -48,12 +54,12 @@ public:
   static constexpr DQMAxis kFebChannel = DQMAxis::Counts(0, CRVDQMRun1::kNChanPerFEB - 1);
   static constexpr DQMAxis kRocChannelEdges{CRVDQMRun1::kNChanPerROC, 0., CRVDQMRun1::kNChanPerROC};
   static constexpr DQMAxis kFebChannelEdges{CRVDQMRun1::kNChanPerFEB, 0., CRVDQMRun1::kNChanPerFEB};
-  static constexpr DQMAxis kOfflineChannel = DQMAxis::Counts(0, CRVDQMRun1::kNOfflineChannels - 1);
   static constexpr DQMAxis kBarId{200, -0.5, CRVId::nBars - 0.5};
   static constexpr DQMAxis kSiPM = DQMAxis::Counts(0, 3);
-  // The global FEB ID, online channel and FPGA-pair axes are sized by the
-  // configuration: CRVDQMRun1::globalFebAxis(c), onlineChannelAxis(c),
-  // globalFebEdgesAxis(c), fpgaPairAxis(c).
+  // The global FEB ID, online channel, FPGA-pair and offline channel axes are
+  // sized by the configuration: CRVDQMRun1::globalFebAxis(c),
+  // onlineChannelAxis(c), globalFebEdgesAxis(c), fpgaPairAxis(c),
+  // offlineChannelAxis(c).
   static constexpr DQMAxis kDtFpga = DQMAxis::Symmetric(50., 0.5);
   static constexpr DQMAxis kDigisPerChannelAndEvent{200, 0., 0.1};
   static constexpr DQMAxis kDigisPerChannelAndEvent2{250, 0., 5.};
@@ -78,6 +84,24 @@ public:
   static constexpr DQMAxis kGroupsPerEvent2{200, -0.5, 999.5};
   static constexpr DQMAxis kSectorsPerEvent = DQMAxis::Counts(0, 23);
 
+  // Configured digi-time pairs: one TH1F of t_B - t_A per pair, over every
+  // pair of digis on the two FPGAs in an event, with no selection on the
+  // digis. A and B are any two FPGAs of the readout; A = B pairs one FPGA's
+  // different channels, later digi in the collection minus earlier (as
+  // dtFpgaPairs). Times are uncalibrated, so a pair on two FEBs sits at their
+  // relative delay; KPP CRVTime offsets reach 113 ns
+  // (calib_extracted_20260630.txt): hence the wide axis.
+  struct FpgaAddress {
+    int roc{0};   //1-based
+    int feb{0};   //ROC port, 1-based
+    int fpga{0};  //0-based
+  };
+  struct DtPair {
+    FpgaAddress a;
+    FpgaAddress b;
+  };
+  static constexpr DQMAxis kDtPair = DQMAxis::Symmetric(250., 0.5);
+
   // Live series: digis summed over the last kEwtWindow events, and the mean
   // over blocks of kAvgBlockSize events.
   static constexpr std::size_t kEwtWindow = 1000;
@@ -92,11 +116,14 @@ public:
     bool valid{false};
   };
 
-  // `configuration` (CRVDQMRun1::Configuration) sizes the readout-indexed
-  // axes and chooses the per-sector family; it is fixed at construction,
+  // `configuration` (CRVDQMRun1::Configuration) sizes the readout-indexed and
+  // offline-channel axes and chooses the per-sector family; it is fixed at construction,
   // before Book(), and stamped into the output as the binning variant.
+  // `dtPairs` chooses the dtPair_* histograms and joins the variant; an
+  // address outside the configuration's readout, or a repeated pair, throws.
   explicit CRVDigiDQM(const DQMHistSet::Config& hists = {},
-                      int configuration = CRVDQMRun1::kRun1a);
+                      int configuration = CRVDQMRun1::kRun1a,
+                      std::vector<DtPair> dtPairs = {});
 
   int configuration() const { return bookedConfiguration_; }
   int nROC() const { return CRVDQMRun1::nROC(bookedConfiguration_); }
@@ -107,7 +134,8 @@ public:
   // channelToSector: offline channel -> index into the configuration's
   // CRVDQMRun1 sector list, -1 to skip the channel. A configuration other
   // than the booked one is refused (diagnostic), since its sector family and
-  // readout axes were not booked.
+  // readout axes were not booked; geometry channels past the booked offline
+  // channel axis are counted (diagnostic) and have no occupancy.
   void SetConfiguration(int configuration, const std::vector<int>& channelToSector);
   // febTopology indexed by global FEB ID; channelToLayer by offline channel.
   // Without it the partner-dt histograms stay empty.
@@ -140,6 +168,10 @@ public:
   TH1F* groupsPerEvent() const { return h_groupsPerEvent_; }
   TH1F* sectorsPerEvent() const { return h_sectorsPerEvent_; }
   TH1F* febNoGroup() const { return h_febNoGroup_; }  //FEB had hits, no group formed
+  //configured pairs, in FHiCL order: t_B - t_A over all digi pairs
+  const std::vector<DtPair>& dtPairConfig() const { return dtPairConfig_; }
+  TH1F* dtPair(std::size_t i) const;
+  static std::string dtPairName(const DtPair& p);
 
   std::size_t nDigis() const { return nDigis_; }
   std::size_t nGroups() const { return nGroups_; }
@@ -174,6 +206,11 @@ private:
   int dtClassFor(int febA, int febB) const;
   void fillEwtSeries(uint64_t ewt, int nDigis);
   void fillSectorOccupancy();
+  void validateDtPairs() const;
+  void fillDtPairs();
+  // Every digi has one: constant fraction with no amplitude cut, else (flat
+  // waveform, maximum in the first sample) the time of its largest sample.
+  double unfilteredTime(const CrvDigi& digi);
 
   DQMH1<TH1F> h1_digisPerEvt_;
   DQMH1<TH1F> h1_digisPerEvt2_;
@@ -198,6 +235,14 @@ private:
   // [sector] of the booked configuration, short and full view
   std::vector<DQMH1<TH1F>> h_sectorOccupancy_;
   std::vector<DQMH1<TH1F>> h_sectorOccupancy2_;
+  std::vector<DQMH1<TH1F>> h_dtPair_;  //[configured pair]
+
+  // Configured pairs. Each distinct FPGA they name is a slot; a slot holds the
+  // event's digis on that FPGA.
+  const std::vector<DtPair> dtPairConfig_;
+  std::vector<int> fpgaSlot_;                        //[globalFeb*kNFPGAPerFEB+fpga], -1 if unused
+  std::vector<std::pair<int, int>> dtPairSlots_;     //[configured pair] -> (slot A, slot B)
+  std::vector<std::vector<FpgaHit>> slotHits_;       //[slot], refilled every event
 
   DQMSeries* g_digisVsEwt_{nullptr};
   DQMSeries* g_digisAvgVsEwt_{nullptr};

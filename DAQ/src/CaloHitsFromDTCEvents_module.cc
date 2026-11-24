@@ -314,7 +314,6 @@ void art::CaloHitsFromDataDTCEvents::analyze_calorimeter_(
         }
 
         if (!offlineId.crystal().isValid()) continue; // Skip pin-diodes
-        
         uint16_t crystalID = offlineId.crystal().id();
         size_t peakIndex = thisHitPacket.IndexOfMaxDigitizerSample;
         float eDep = thisHitPeak * adc2MeV;
