@@ -44,7 +44,7 @@ namespace mu2e {
       fhicl::Atom<float>           maxDt         {Name("maxDt"         ), Comment("max abs(DT)")};
       fhicl::Atom<float>           minEDep       {Name("minEDep"       ), Comment("min EDep")};
       fhicl::Atom<int>             minNGoodHits  {Name("minNGoodHits"  ), Comment("minNStrawDigis")};
-      fhicl::Sequence<int>         channelsToSkip{Name("channelsToSkip"), Comment("a list of channels to skip")};
+      fhicl::Sequence<int>         channelsToSkip{Name("channelsToSkip"), Comment("pairs of MN id and straw to leave out of the good-hit count"), std::vector<int>{}};
       fhicl::Atom<bool>            fillHistograms{Name("fillHistograms"), Comment("fill histogrms, default:false")};
     };
 
@@ -141,7 +141,7 @@ namespace mu2e {
       Channel_t* ch = & _channelsToSkip[i];
       std::cout << std::format("disabled : mnid:MN{:03d} straw:{:02d}\n",ch->mnid, ch->straw);
     }
-    
+
     _run_initialized = false;
   }
 
@@ -224,7 +224,8 @@ namespace mu2e {
 
     _event         = &ArtEvent;         // should always be the first line
 
-    _trkPanelMap = &_tpm_h.get(_event->id());
+    // the panel map is only needed to resolve the channels to skip
+    _trkPanelMap = _channelsToSkip.empty() ? nullptr : &_tpm_h.get(_event->id());
 
     if (_debugMode) print_("-- START");
 
@@ -247,29 +248,28 @@ namespace mu2e {
     _nshg          = 0;
 
     float _edepp = 0;
-    
+
     for (int i = 0; i<_nsht; ++i) {
       const mu2e::StrawHit* sh = &_shc->at(i);
-      
-      int pln  = sh->strawId().plane();
-      int pnl  = sh->strawId().panel();
-      const TrkPanelMap::Row* tpm = _trkPanelMap->panel_map_by_offline_ind(pln,pnl);
-      int hit_mnid = tpm->mnid();
 
       if (sh->energyDep() > _edepp) _edepp = sh->energyDep();
 
-      bool skip = false;
-
-      int n_disabled_channels = _channelsToSkip.size();
-      for (int i=0; i<n_disabled_channels; i++) {
-        Channel_t* ch = & _channelsToSkip[i];
-        if ((hit_mnid == ch->mnid) and (sh->strawId().straw() == ch->straw)) {
-          skip = true;
-          break;
+      if (_trkPanelMap) {
+        int pln  = sh->strawId().plane();
+        int pnl  = sh->strawId().panel();
+        const TrkPanelMap::Row* tpm = _trkPanelMap->panel_map_by_offline_ind(pln,pnl);
+        if (tpm) {
+          int  hit_mnid = tpm->mnid();
+          bool skip     = false;
+          for (const Channel_t& ch : _channelsToSkip) {
+            if ((hit_mnid == ch.mnid) and (sh->strawId().straw() == ch.straw)) {
+              skip = true;
+              break;
+            }
+          }
+          if (skip) continue;
         }
       }
-
-      if (skip) continue;
 
       if (fabs(sh->dt())  > _maxDt  ) continue;
       if (sh->energyDep() < _minEDep) continue;
